@@ -28,25 +28,21 @@ import (
 	"github.com/xenolf/lego/providers/dns"
 )
 
-var (
-	// OSCPMustStaple enables OSCP stapling as from https://github.com/xenolf/lego/issues/270
-	OSCPMustStaple = false
-)
-
 // Configuration holds ACME configuration provided by users
 type Configuration struct {
-	Email         string         `description:"Email address used for registration"`
-	ACMELogging   bool           `description:"Enable debug logging of ACME actions."`
-	CAServer      string         `description:"CA server to use."`
-	Storage       string         `description:"Storage to use."`
-	EntryPoint    string         `description:"EntryPoint to use."`
-	KeyType       string         `description:"KeyType used for generating certificate private key. Allow value 'EC256', 'EC384', 'RSA2048', 'RSA4096', 'RSA8192'. Default to 'RSA4096'"`
-	OnHostRule    bool           `description:"Enable certificate generation on frontends Host rules."`
-	OnDemand      bool           `description:"Enable on demand certificate generation. This will request a certificate from Let's Encrypt during the first TLS handshake for a hostname that does not yet have a certificate."` // Deprecated
-	DNSChallenge  *DNSChallenge  `description:"Activate DNS-01 Challenge"`
-	HTTPChallenge *HTTPChallenge `description:"Activate HTTP-01 Challenge"`
-	TLSChallenge  *TLSChallenge  `description:"Activate TLS-ALPN-01 Challenge"`
-	Domains       []types.Domain `description:"CN and SANs (alternative domains) to each main domain using format: --acme.domains='main.com,san1.com,san2.com' --acme.domains='*.main.net'. No SANs for wildcards domain. Wildcard domains only accepted with DNSChallenge"`
+	Email          string         `description:"Email address used for registration"`
+	CAServer       string         `description:"CA server to use."`
+	Storage        string         `description:"Storage to use."`
+	EntryPoint     string         `description:"EntryPoint to use."`
+	KeyType        string         `description:"KeyType used for generating certificate private key. Allow value 'EC256', 'EC384', 'RSA2048', 'RSA4096', 'RSA8192'. Default to 'RSA4096'"`
+	ACMELogging    bool           `description:"Enable debug logging of ACME actions."`
+	OCSPMustStaple bool           `description:"Enables OCSP stapling"`
+	OnHostRule     bool           `description:"Enable certificate generation on frontends Host rules."`
+	OnDemand       bool           `description:"Enable on demand certificate generation. This will request a certificate from Let's Encrypt during the first TLS handshake for a hostname that does not yet have a certificate."` // Deprecated
+	DNSChallenge   *DNSChallenge  `description:"Activate DNS-01 Challenge"`
+	HTTPChallenge  *HTTPChallenge `description:"Activate HTTP-01 Challenge"`
+	TLSChallenge   *TLSChallenge  `description:"Activate TLS-ALPN-01 Challenge"`
+	Domains        []types.Domain `description:"CN and SANs (alternative domains) to each main domain using format: --acme.domains='main.com,san1.com,san2.com' --acme.domains='*.main.net'. No SANs for wildcards domain. Wildcard domains only accepted with DNSChallenge"`
 }
 
 // Provider holds configurations of the provider.
@@ -408,9 +404,9 @@ func (p *Provider) resolveCertificate(domain types.Domain, domainFromConfigurati
 	var certificate *acme.CertificateResource
 	bundle := true
 	if p.useCertificateWithRetry(uncheckedDomains) {
-		certificate, err = obtainCertificateWithRetry(domains, client, p.DNSChallenge.preCheckTimeout, p.DNSChallenge.preCheckInterval, bundle)
+		certificate, err = obtainCertificateWithRetry(domains, client, p.DNSChallenge.preCheckTimeout, p.DNSChallenge.preCheckInterval, bundle, p.Configuration.OCSPMustStaple)
 	} else {
-		certificate, err = client.ObtainCertificate(domains, bundle, nil, OSCPMustStaple)
+		certificate, err = client.ObtainCertificate(domains, bundle, nil, p.Configuration.OCSPMustStaple)
 	}
 
 	if err != nil {
@@ -479,12 +475,12 @@ func (p *Provider) useCertificateWithRetry(domains []string) bool {
 	return false
 }
 
-func obtainCertificateWithRetry(domains []string, client *acme.Client, timeout, interval time.Duration, bundle bool) (*acme.CertificateResource, error) {
+func obtainCertificateWithRetry(domains []string, client *acme.Client, timeout, interval time.Duration, bundle, ocsp bool) (*acme.CertificateResource, error) {
 	var certificate *acme.CertificateResource
 	var err error
 
 	operation := func() error {
-		certificate, err = client.ObtainCertificate(domains, bundle, nil, OSCPMustStaple)
+		certificate, err = client.ObtainCertificate(domains, bundle, nil, ocsp)
 		return err
 	}
 
@@ -659,7 +655,7 @@ func (p *Provider) renewCertificates() {
 				Domain:      certificate.Domain.Main,
 				PrivateKey:  certificate.Key,
 				Certificate: certificate.Certificate,
-			}, true, OSCPMustStaple)
+			}, true, p.Configuration.OCSPMustStaple)
 
 			if err != nil {
 				log.Errorf("Error renewing certificate from LE: %v, %v", certificate.Domain, err)

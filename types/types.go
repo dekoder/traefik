@@ -522,8 +522,10 @@ func (clientTLS *ClientTLS) CreateTLSConfig() (*tls.Config, error) {
 		log.Warnf("clientTLS is nil")
 		return nil, nil
 	}
+
 	caPool := x509.NewCertPool()
 	clientAuth := tls.NoClientCert
+
 	if clientTLS.CA != "" {
 		var ca []byte
 		if _, errCA := os.Stat(clientTLS.CA); errCA == nil {
@@ -534,9 +536,11 @@ func (clientTLS *ClientTLS) CreateTLSConfig() (*tls.Config, error) {
 		} else {
 			ca = []byte(clientTLS.CA)
 		}
+
 		if !caPool.AppendCertsFromPEM(ca) {
 			return nil, fmt.Errorf("failed to parse CA")
 		}
+
 		if clientTLS.CAOptional {
 			clientAuth = tls.VerifyClientCertIfGiven
 		} else {

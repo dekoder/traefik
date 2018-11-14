@@ -597,11 +597,11 @@ func (s *Server) buildServerEntryPoints() map[string]*serverEntryPoint {
 				}
 				serverEntryPoints[entryPointName].certs.DefaultCertificate = cert
 			}
+
 			if len(entryPoint.Configuration.TLS.Certificates) > 0 {
 				config, _ := entryPoint.Configuration.TLS.Certificates.CreateTLSConfig(entryPointName)
 				certMap := s.buildNameOrIPToCertificate(config.Certificates)
 				serverEntryPoints[entryPointName].certs.StaticCerts.Set(certMap)
-
 			}
 		}
 	}

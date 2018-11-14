@@ -33,11 +33,6 @@ import (
 	"github.com/xenolf/lego/providers/dns"
 )
 
-var (
-	// OSCPMustStaple enables OSCP stapling as from https://github.com/xenolf/lego/issues/270
-	OSCPMustStaple = false
-)
-
 // ACME allows to connect to lets encrypt and retrieve certs
 // Deprecated Please use provider/acme/Provider
 type ACME struct {
@@ -47,6 +42,7 @@ type ACME struct {
 	StorageFile           string                      // Deprecated
 	OnDemand              bool                        `description:"(Deprecated) Enable on demand certificate generation. This will request a certificate from Let's Encrypt during the first TLS handshake for a hostname that does not yet have a certificate."` // Deprecated
 	OnHostRule            bool                        `description:"Enable certificate generation on frontends Host rules."`
+	OCSPMustStaple        bool                        `description:"Enables OCSP stapling"`
 	CAServer              string                      `description:"CA server to use."`
 	EntryPoint            string                      `description:"Entrypoint to proxy acme challenge to."`
 	KeyType               string                      `description:"KeyType used for generating certificate private key. Allow value 'EC256', 'EC384', 'RSA2048', 'RSA4096', 'RSA8192'. Default to 'RSA4096'"`
@@ -373,7 +369,7 @@ func (a *ACME) renewACMECertificate(certificateResource *DomainsCertificate) (*C
 		CertStableURL: certificateResource.Certificate.CertStableURL,
 		PrivateKey:    certificateResource.Certificate.PrivateKey,
 		Certificate:   certificateResource.Certificate.Certificate,
-	}, true, OSCPMustStaple)
+	}, true, a.OCSPMustStaple)
 	if err != nil {
 		return nil, err
 	}
@@ -708,7 +704,7 @@ func (a *ACME) getDomainsCertificates(domains []string) (*Certificate, error) {
 	log.Debugf("Loading ACME certificates %s...", cleanDomains)
 	bundle := true
 
-	certificate, err := a.client.ObtainCertificate(cleanDomains, bundle, nil, OSCPMustStaple)
+	certificate, err := a.client.ObtainCertificate(cleanDomains, bundle, nil, a.OCSPMustStaple)
 	if err != nil {
 		return nil, fmt.Errorf("cannot obtain certificates: %+v", err)
 	}
